@@ -78,7 +78,7 @@ const SYSTEM_PROMPT = `أنت مساعد ذكي ومحترف للإجابة عل
 4. كن محترفاً ودقيقاً في المعلومات
 5. استخدم التنسيق المناسب (قوائم، عناوين) لتسهيل القراءة`;
 
-// ===== استدعاء AI API =====
+// ===== استدعاء Google Gemini API =====
 async function callAI(userMessage) {
     const settings = getSettings();
     if (!settings.apiKey) {
@@ -86,21 +86,24 @@ async function callAI(userMessage) {
     }
 
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + settings.apiKey
-            },
-            body: JSON.stringify({
-                model: 'llama-3.1-8b-instant',
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: userMessage }
-                ],
+        const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + settings.apiKey;
+
+        const body = {
+            contents: [{
+                parts: [{
+                    text: SYSTEM_PROMPT + '\n\nالسؤال: ' + userMessage
+                }]
+            }],
+            generationConfig: {
                 temperature: 0.5,
-                max_tokens: 1024
-            })
+                maxOutputTokens: 1024
+            }
+        };
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -110,7 +113,7 @@ async function callAI(userMessage) {
         }
 
         const data = await response.json();
-        return data.choices[0].message.content;
+        return data.candidates[0].content.parts[0].text;
     } catch (e) {
         console.error('API Call Failed:', e);
         return 'لا يمكن الاتصال بالذكاء الاصطناعي الآن. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.';

@@ -1,5 +1,5 @@
 {
     "encoded_key": "QVEuQWI4Uk42S2ZyUkJPdWNZLWtkWkpPZXNNT1FZMzgtZkxCNS1tOE1LaHhGVW1wekg1Z2c=",
-    "model": "llama-3.1-8b-instant",
-    "api_url": "https://api.groq.com/openai/v1/chat/completions"
+    "model": "gemini-2.0-flash",
+    "api_url": "https://generativelanguage.googleapis.com/v1beta/models"
 }
