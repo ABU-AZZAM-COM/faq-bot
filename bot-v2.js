@@ -350,9 +350,25 @@ function getSmartFallback(input, settings) {
 }
 
 // ===== الإعدادات =====
+let configData = {};
+
+async function loadConfig() {
+    try {
+        const response = await fetch('config.json');
+        configData = await response.json();
+        // فك تشفير المفتاح
+        if (configData.encoded_key) {
+            configData.api_key = atob(configData.encoded_key);
+        }
+    } catch (e) {
+        console.log('Config not found, using localStorage');
+        configData = {};
+    }
+}
+
 function getSettings() {
     return {
-        apiKey: localStorage.getItem('bot_api_key') || '',
+        apiKey: configData.api_key || localStorage.getItem('bot_api_key') || '',
         personality: localStorage.getItem('bot_personality') || 'formal',
         tone: localStorage.getItem('bot_tone') || 'victorian'
     };
@@ -489,7 +505,8 @@ function askQuestion(q) {
 }
 
 // ===== التهيئة =====
-window.onload = function() {
+window.onload = async function() {
+    await loadConfig();
     const settings = getSettings();
     document.getElementById('apiKeyInput').value = settings.apiKey;
     document.getElementById('personalitySelect').value = settings.personality;
