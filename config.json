@@ -1,5 +1,5 @@
 {
     "encoded_key": "QVEuQWI4Uk42S2ZyUkJPdWNZLWtkWkpPZXNNT1FZMzgtZkxCNS1tOE1LaHhGVW1wekg1Z2c=",
-    "model": "gemini-2.0-flash",
+    "model": "gemini-2.0-flash-lite",
     "api_url": "https://generativelanguage.googleapis.com/v1beta/models"
 }

@@ -86,7 +86,7 @@ async function callAI(userMessage) {
     }
 
     try {
-        const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + settings.apiKey;
+        const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=' + settings.apiKey;
 
         const body = {
             contents: [{
@@ -105,6 +105,10 @@ async function callAI(userMessage) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
+
+        if (response.status === 429) {
+            return 'الخدمة مزدحمة حالياً، يرجى المحاولة بعد 30 ثانية.';
+        }
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
