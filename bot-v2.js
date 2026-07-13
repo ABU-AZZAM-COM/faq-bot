@@ -13,6 +13,7 @@ let isProcessing = false;
 let activeChatId = null;
 let chatsData = {};
 let allKnowledge = {};
+let settingsPin = null;
 
 const CHATS_KEY = 'tabasim_chats';
 const ACTIVE_CHAT_KEY = 'tabasim_active_chat';
@@ -189,6 +190,34 @@ async function processAI(messages) {
     return msg.content || null;
 }
 
+// ===== Toast & Confirm =====
+function toast(msg, err = false) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${err ? '#b91c1c' : '#065f46'};color:#fff;padding:12px 28px;border-radius:30px;font-weight:600;z-index:9999;font-family:'Amiri',serif;`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+function showConfirm(message) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:5000;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = `
+            <div style="background:var(--card-bg);border:2px solid var(--gold);border-radius:16px;padding:24px;text-align:center;max-width:350px;width:90%;">
+                <p style="font-size:1rem;margin-bottom:20px;font-weight:600;">${message}</p>
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <button id="confirmYes" class="btn btn-primary">نعم</button>
+                    <button id="confirmNo" class="btn btn-ghost">إلغاء</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#confirmYes').onclick = () => { overlay.remove(); resolve(true); };
+        overlay.querySelector('#confirmNo').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    });
+}
+
 // ===== واجهة المستخدم =====
 function addMsg(text, sender) {
     const chatMessages = document.getElementById('chatMessages');
@@ -361,7 +390,129 @@ function closeSidebar() {
     document.getElementById('sidebarOverlay').classList.remove('show');
 }
 
-// ===== إعدادات AI =====
+// ===== PIN Protection =====
+async function loadPin() {
+    try {
+        settingsPin = (await db.ref('tabasimPin').once('value')).val();
+    } catch (e) { settingsPin = null; }
+}
+
+function showPinForm(isSetup) {
+    const content = document.getElementById('settingsContent');
+    content.innerHTML = `
+        <h3>${isSetup ? '🔐 إنشاء رمز PIN' : '🔐 أدخل رمز PIN'}</h3>
+        <div class="section-card">
+            <input type="password" id="pinInput" placeholder="PIN" maxlength="6" style="width:100%;padding:12px;border-radius:10px;text-align:center;font-size:1.2rem;border:1px solid var(--gold);background:var(--input-bg);color:var(--text);font-family:'Amiri',serif;">
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" id="pinSubmitBtn">${isSetup ? 'حفظ' : 'دخول'}</button>
+            <button class="btn btn-ghost" id="pinCancelBtn">إلغاء</button>
+        </div>`;
+    
+    document.getElementById('pinSubmitBtn').onclick = async () => {
+        const pin = document.getElementById('pinInput').value.trim();
+        if (!pin || pin.length < 4) { toast('الرمز يجب أن يكون 4 أرقام على الأقل', true); return; }
+        if (isSetup) {
+            await db.ref('tabasimPin').set(pin);
+            settingsPin = pin;
+            document.getElementById('settingsModal').classList.remove('show');
+            showSettingsForm();
+        } else {
+            if (pin === settingsPin) {
+                document.getElementById('settingsModal').classList.remove('show');
+                showSettingsForm();
+            } else {
+                toast('الرمز خاطئ', true);
+            }
+        }
+    };
+    document.getElementById('pinCancelBtn').onclick = () => document.getElementById('settingsModal').classList.remove('show');
+    document.getElementById('settingsModal').classList.add('show');
+}
+
+async function showSettings() {
+    await loadPin();
+    if (settingsPin) {
+        showPinForm(false);
+    } else {
+        showPinForm(true);
+    }
+}
+
+async function showSettingsForm() {
+    const snap = await settingsRef.once('value');
+    const s = snap.val() || {};
+    const content = document.getElementById('settingsContent');
+    content.innerHTML = `
+        <h3>⚙️ إعدادات المساعد</h3>
+        <div class="section-card">
+            <h4>🧠 الشخصية</h4>
+            <div class="form-row"><label>اسم المساعد</label><input type="text" id="setName" value="${s.name || 'مساعد التبصيم'}"></div>
+            <div class="form-row"><label>الشخصية</label><select id="setPersonality">
+                <option value="مهذب" ${s.personality === 'مهذب' ? 'selected' : ''}>مهذب</option>
+                <option value="رسمي" ${s.personality === 'رسمي' ? 'selected' : ''}>رسمي</option>
+                <option value="ودود" ${s.personality === 'ودود' ? 'selected' : ''}>ودود</option>
+                <option value="صارم" ${s.personality === 'صارم' ? 'selected' : ''}>صارم</option>
+            </select></div>
+        </div>
+        <div class="section-card">
+            <h4>☁️ مزود الذكاء الاصطناعي</h4>
+            <div class="form-row"><label>المزود</label><select id="setProvider">
+                <option value="openrouter" ${s.provider === 'openrouter' ? 'selected' : ''}>OpenRouter (Gemini)</option>
+                <option value="deepseek" ${s.provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
+            </select></div>
+            <div class="form-row"><label>مفتاح OpenRouter</label><input type="password" id="setOpenRouterKey" value="${s.openRouterKey || ''}" placeholder="sk-or-v1-..."></div>
+            <div class="form-row"><label>مفتاح DeepSeek</label><input type="password" id="setDeepseekKey" value="${s.deepseekKey || ''}" placeholder="sk-..."></div>
+            <button class="btn btn-ghost" id="testBtn">🔌 اختبار الاتصال</button> <span id="testStatus"></span>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn btn-primary" id="saveBtn">💾 حفظ</button>
+            <button class="btn btn-danger" id="resetPinBtn">إعادة تعيين PIN</button>
+            <button class="btn btn-ghost" id="closeBtn">إغلاق</button>
+        </div>`;
+
+    document.getElementById('testBtn').onclick = async () => {
+        const prov = document.getElementById('setProvider').value;
+        const key = prov === 'deepseek' ? document.getElementById('setDeepseekKey').value.trim() : document.getElementById('setOpenRouterKey').value.trim();
+        const el = document.getElementById('testStatus');
+        if (!key) { el.textContent = 'أدخل المفتاح أولاً'; return; }
+        el.textContent = 'جاري الاختبار...';
+        const r = await testProviderKey(key, prov);
+        el.textContent = r.ok ? '✅ متصل!' : `❌ ${r.msg}`;
+        el.style.color = r.ok ? '#10b981' : '#ef4444';
+    };
+
+    document.getElementById('saveBtn').onclick = async () => {
+        provider = document.getElementById('setProvider').value;
+        openRouterKey = document.getElementById('setOpenRouterKey').value.trim();
+        deepseekKey = document.getElementById('setDeepseekKey').value.trim();
+        const name = document.getElementById('setName').value;
+        const personality = document.getElementById('setPersonality').value;
+        try {
+            await settingsRef.set({ name, personality, provider, openRouterKey, deepseekKey });
+        } catch (e) { console.log('Save failed:', e); }
+        assistantConfig = { name, personality };
+        document.getElementById('assistantName').textContent = name;
+        document.getElementById('settingsModal').classList.remove('show');
+        toast('تم الحفظ بنجاح');
+        await initAI();
+    };
+
+    document.getElementById('resetPinBtn').onclick = async () => {
+        const ok = await showConfirm('هل تريد إعادة تعيين رمز PIN؟');
+        if (ok) {
+            await db.ref('tabasimPin').remove();
+            settingsPin = null;
+            toast('تم إعادة التعيين');
+            document.getElementById('settingsModal').classList.remove('show');
+        }
+    };
+
+    document.getElementById('closeBtn').onclick = () => document.getElementById('settingsModal').classList.remove('show');
+    document.getElementById('settingsModal').classList.add('show');
+}
+
+// ===== اختبار الاتصال =====
 async function testProviderKey(key, providerType) {
     const url = providerType === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions';
     const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
@@ -390,65 +541,6 @@ async function loadConfig() {
         provider = data.provider || 'openrouter';
         document.getElementById('assistantName').textContent = assistantConfig.name;
     } catch (e) { console.log('Config load failed:', e); }
-}
-
-function showSettings() {
-    const modal = document.getElementById('settingsModal');
-    const content = document.getElementById('settingsContent');
-    content.innerHTML = `
-        <h3>⚙️ إعدادات المساعد</h3>
-        <div class="section-card">
-            <h4>🧠 الشخصية</h4>
-            <div class="form-row"><label>اسم المساعد</label><input type="text" id="setName" value="${assistantConfig.name}"></div>
-            <div class="form-row"><label>الشخصية</label><select id="setPersonality">
-                <option value="مهذب" ${assistantConfig.personality === 'مهذب' ? 'selected' : ''}>مهذب</option>
-                <option value="رسمي" ${assistantConfig.personality === 'رسمي' ? 'selected' : ''}>رسمي</option>
-                <option value="ودود" ${assistantConfig.personality === 'ودود' ? 'selected' : ''}>ودود</option>
-                <option value="صارم" ${assistantConfig.personality === 'صارم' ? 'selected' : ''}>صارم</option>
-            </select></div>
-        </div>
-        <div class="section-card">
-            <h4>☁️ مزود الذكاء الاصطناعي</h4>
-            <div class="form-row"><label>المزود</label><select id="setProvider">
-                <option value="openrouter" ${provider === 'openrouter' ? 'selected' : ''}>OpenRouter (Gemini)</option>
-                <option value="deepseek" ${provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
-            </select></div>
-            <div class="form-row"><label>مفتاح OpenRouter</label><input type="password" id="setOpenRouterKey" value="${openRouterKey}" placeholder="sk-or-v1-..."></div>
-            <div class="form-row"><label>مفتاح DeepSeek</label><input type="password" id="setDeepseekKey" value="${deepseekKey}" placeholder="sk-..."></div>
-            <button class="btn btn-ghost" id="testBtn">🔌 اختبار الاتصال</button> <span id="testStatus"></span>
-        </div>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn btn-primary" id="saveBtn">💾 حفظ</button>
-            <button class="btn btn-ghost" id="closeBtn">إغلاق</button>
-        </div>`;
-
-    document.getElementById('testBtn').onclick = async () => {
-        const prov = document.getElementById('setProvider').value;
-        const key = prov === 'deepseek' ? document.getElementById('setDeepseekKey').value.trim() : document.getElementById('setOpenRouterKey').value.trim();
-        const el = document.getElementById('testStatus');
-        if (!key) { el.textContent = 'أدخل المفتاح أولاً'; return; }
-        el.textContent = 'جاري الاختبار...';
-        const r = await testProviderKey(key, prov);
-        el.textContent = r.ok ? '✅ متصل!' : `❌ ${r.msg}`;
-        el.style.color = r.ok ? '#10b981' : '#ef4444';
-    };
-
-    document.getElementById('saveBtn').onclick = async () => {
-        provider = document.getElementById('setProvider').value;
-        openRouterKey = document.getElementById('setOpenRouterKey').value.trim();
-        deepseekKey = document.getElementById('setDeepseekKey').value.trim();
-        const name = document.getElementById('setName').value;
-        const personality = document.getElementById('setPersonality').value;
-        try {
-            await settingsRef.set({ name, personality, provider, openRouterKey, deepseekKey });
-        } catch (e) { console.log('Save failed:', e); }
-        assistantConfig = { name, personality };
-        document.getElementById('assistantName').textContent = name;
-        modal.classList.remove('show');
-    };
-
-    document.getElementById('closeBtn').onclick = () => modal.classList.remove('show');
-    modal.classList.add('show');
 }
 
 // ===== التهيئة =====
@@ -483,4 +575,6 @@ window.onload = async function() {
     renderSidebar();
     renderMessages();
     await loadConfig();
+    await loadPin();
+    await initAI();
 };

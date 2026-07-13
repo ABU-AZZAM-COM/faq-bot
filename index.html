@@ -204,6 +204,17 @@
             background: rgba(201,162,39,0.2);
         }
 
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .status-dot.online { background: #10b981; }
+        .status-dot.offline { background: #ef4444; }
+
         .header-center {
             flex: 1;
             text-align: center;
@@ -461,6 +472,8 @@
         .btn-primary:hover { background: var(--gold-light); }
         .btn-ghost { background: transparent; border: 1px solid var(--gold); color: var(--text); }
         .btn-ghost:hover { background: rgba(201,162,39,0.15); }
+        .btn-danger { background: #b91c1c; color: #fff; border: none; }
+        .btn-danger:hover { background: #991b1b; }
 
         /* ===== Footer ===== */
         .footer {
@@ -510,7 +523,7 @@
                 <button class="menu-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
                 <button class="back-btn" id="backBtn" style="display:none;"><i class="fas fa-arrow-right"></i></button>
                 <div class="header-center">
-                    <h1 id="assistantName">⚜️ مساعد التبصيم ⚜️</h1>
+                    <h1><span id="assistantName">⚜️ مساعد التبصيم ⚜️</span> <span class="status-dot" id="aiStatus"></span></h1>
                     <div class="subtitle">للإجابة على أسئلتك بخصوص الأوراق المطلوبة</div>
                 </div>
                 <button class="dark-toggle-btn" id="darkToggleBtn"><i class="fas fa-moon"></i></button>
