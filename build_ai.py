@@ -1,4 +1,6 @@
-// ============================================
+import os
+
+bot_js = r'''// ============================================
 // المساعد الذكي - نسخة الذكاء الاصطناعي
 // مع نظام ذكي لتجنب مشاكل Rate Limiting
 // ============================================
@@ -244,3 +246,12 @@ window.onload = async function() {
     }
     quickDiv.innerHTML = html;
 };
+'''
+
+base = r"C:\Users\AZZAM\Desktop\البوت المساعد"
+
+with open(os.path.join(base, "bot-v2.js"), "w", encoding="utf-8") as f:
+    f.write(bot_js)
+print("OK")
+
+print("Done!")
